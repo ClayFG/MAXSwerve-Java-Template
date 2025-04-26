@@ -68,9 +68,16 @@ public class RobotContainer {
    * {@link JoystickButton}.
    */
   private void configureButtonBindings() {
-    new JoystickButton(m_driverController, Button.kR1.value)
+    //When right bumper pessed set wheels to X mode
+    new JoystickButton(m_driverController, XboxController.Button.kRightBumper.value)
         .whileTrue(new RunCommand(
             () -> m_robotDrive.setX(),
+            m_robotDrive));
+
+    //when Left bumper pressed zero the navx heading once
+    new JoystickButton(m_driverController, XboxController.Button.kLeftBumper.value)
+        .onTrue(new RunCommand(
+            () -> m_robotDrive.zeroHeading(),
             m_robotDrive));
   }
 
