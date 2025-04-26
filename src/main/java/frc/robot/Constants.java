@@ -45,16 +45,25 @@ public final class Constants {
     public static final double kBackLeftChassisAngularOffset = Math.PI;
     public static final double kBackRightChassisAngularOffset = Math.PI / 2;
 
-    // SPARK MAX CAN IDs
-    public static final int kFrontLeftDrivingCanId = 11;
-    public static final int kRearLeftDrivingCanId = 13;
-    public static final int kFrontRightDrivingCanId = 15;
-    public static final int kRearRightDrivingCanId = 17;
+    // SPARK MAX CAN IDs this is a bad naming convention and should be modified to a standard
+    // example standard 
+    //00-09 reserved for drive motors 
+    // 10-19 turning 
+    // 20-29 subsystem 1
+    // 30-39 subsystem 2
+
+    //I have made a standard following motor lettering for quadcopters
+    // A front right continuing clockwise
+
+    public static final int kFrontRightDrivingCanId = 0;
+    public static final int kRearRightDrivingCanId = 1;
+    public static final int kRearLeftDrivingCanId = 2;
+    public static final int kFrontLeftDrivingCanId = 3;
 
     public static final int kFrontLeftTurningCanId = 10;
-    public static final int kRearLeftTurningCanId = 12;
-    public static final int kFrontRightTurningCanId = 14;
-    public static final int kRearRightTurningCanId = 16;
+    public static final int kRearLeftTurningCanId = 11;
+    public static final int kFrontRightTurningCanId = 12;
+    public static final int kRearRightTurningCanId = 13;
 
     public static final boolean kGyroReversed = false;
   }
