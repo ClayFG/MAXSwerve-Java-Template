@@ -20,8 +20,10 @@ public final class Configs {
 
             drivingConfig
                     .idleMode(IdleMode.kBrake)
-                    .smartCurrentLimit(50);
-            drivingConfig.encoder
+                    .smartCurrentLimit(29); 
+                        // very important to set this to avoid wheel spin later we can find a sophisticated way of compensating for torque and
+                        //using dynamic limits nad torque curves our wheels conservative estimate should be ~162.56/gear ratio for regular neos
+                    drivingConfig.encoder
                     .positionConversionFactor(drivingFactor) // meters
                     .velocityConversionFactor(drivingFactor / 60.0); // meters per second
             drivingConfig.closedLoop
@@ -33,7 +35,7 @@ public final class Configs {
 
             turningConfig
                     .idleMode(IdleMode.kBrake)
-                    .smartCurrentLimit(20);
+                    .smartCurrentLimit(20); // 20 amps is near the stall current that burns up neo550s
             turningConfig.absoluteEncoder
                     // Invert the turning encoder, since the output shaft rotates in the opposite
                     // direction of the steering motor in the MAXSwerve Module.
