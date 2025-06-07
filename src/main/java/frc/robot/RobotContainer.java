@@ -14,6 +14,7 @@ import edu.wpi.first.math.trajectory.Trajectory;
 import edu.wpi.first.math.trajectory.TrajectoryConfig;
 import edu.wpi.first.math.trajectory.TrajectoryGenerator;
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.AutoConstants;
 import frc.robot.Constants.DriveConstants;
 import frc.robot.Constants.OIConstants;
@@ -41,6 +42,9 @@ public class RobotContainer {
     // Add toggle to switch between field-relative and robot-relative driving
     private boolean robotOriented = false;
 
+    // Add multiplier to adjust max speed of robot
+    private double speedMultiplier = 1.0;
+
   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.
    */
@@ -48,16 +52,25 @@ public class RobotContainer {
     // Configure the button bindings
     configureButtonBindings();
 
+    // Add shuffleboard speed multiplier
+    SmartDashboard.putNumber("Speed Multiplier", speedMultiplier);
+
     // Configure default commands
     m_robotDrive.setDefaultCommand(
         // The left stick controls translation of the robot.
         // Turning is controlled by the X axis of the right stick.
         new RunCommand(
-            () -> m_robotDrive.drive(
-                -MathUtil.applyDeadband(m_driverController.getLeftY(), OIConstants.kDriveDeadband),
-                -MathUtil.applyDeadband(m_driverController.getLeftX(), OIConstants.kDriveDeadband),
-                -MathUtil.applyDeadband(m_driverController.getRightX(), OIConstants.kDriveDeadband),
-                !robotOriented),
+            () -> {
+                // Retrieve the speed multiplier from SmartDashboard
+                double multiplier = SmartDashboard.getNumber("Speed Multiplier", 1.0);
+
+                // Pass the multiplier to the drive method
+                m_robotDrive.drive(
+                    -MathUtil.applyDeadband(m_driverController.getLeftY(), OIConstants.kDriveDeadband) * multiplier,
+                    -MathUtil.applyDeadband(m_driverController.getLeftX(), OIConstants.kDriveDeadband) * multiplier,
+                    -MathUtil.applyDeadband(m_driverController.getRightX(), OIConstants.kDriveDeadband) * multiplier,
+                    !robotOriented);
+            },
             m_robotDrive));
   }
 
