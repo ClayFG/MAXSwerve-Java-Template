@@ -38,6 +38,9 @@ public class RobotContainer {
   // The driver's controller
   XboxController m_driverController = new XboxController(OIConstants.kDriverControllerPort);
 
+    // Add toggle to switch between field-relative and robot-relative driving
+    private boolean robotOriented = false;
+
   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.
    */
@@ -54,7 +57,7 @@ public class RobotContainer {
                 -MathUtil.applyDeadband(m_driverController.getLeftY(), OIConstants.kDriveDeadband),
                 -MathUtil.applyDeadband(m_driverController.getLeftX(), OIConstants.kDriveDeadband),
                 -MathUtil.applyDeadband(m_driverController.getRightX(), OIConstants.kDriveDeadband),
-                true),
+                !robotOriented),
             m_robotDrive));
   }
 
@@ -79,6 +82,10 @@ public class RobotContainer {
         .onTrue(new InstantCommand(
             () -> m_robotDrive.zeroHeading(),
             m_robotDrive));
+
+    //When A button is pressed Toggle between field- and robot-relative
+    new JoystickButton(m_driverController, XboxController.Button.kA.value)
+        .onTrue(new InstantCommand(() -> robotOriented = !robotOriented));
   }
 
   /**
