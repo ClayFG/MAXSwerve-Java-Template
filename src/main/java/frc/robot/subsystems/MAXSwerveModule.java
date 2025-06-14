@@ -4,6 +4,7 @@
 
 package frc.robot.subsystems;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
@@ -18,6 +19,8 @@ import com.revrobotics.AbsoluteEncoder;
 import com.revrobotics.RelativeEncoder;
 
 import frc.robot.Configs;
+import frc.robot.Constants.DriveConstants;
+import frc.robot.Constants.ModuleConstants;;
 
 public class MAXSwerveModule {
   private final SparkMax m_drivingSpark;
@@ -86,6 +89,11 @@ public class MAXSwerveModule {
         new Rotation2d(m_turningEncoder.getPosition() - m_chassisAngularOffset));
   }
 
+  public double getWheelRadians() {
+    return m_drivingEncoder.getPosition()
+                * (2 * Math.PI / ModuleConstants.kDrivingMotorReduction);
+  }
+
   /**
    * Sets the desired state for the module.
    *
@@ -103,6 +111,36 @@ public class MAXSwerveModule {
     // Command driving and turning SPARKS towards their respective setpoints.
     m_drivingClosedLoopController.setReference(correctedDesiredState.speedMetersPerSecond, ControlType.kVelocity);
     m_turningClosedLoopController.setReference(correctedDesiredState.angle.getRadians(), ControlType.kPosition);
+
+    m_desiredState = desiredState;
+  }
+
+  /**
+   * Sets the desired state for the module in open-loop mode.
+   *
+   * @param desiredState Desired state with speed and angle.
+   */
+  public void setDesiredStateOpenLoop(SwerveModuleState desiredState) {
+    // Apply chassis angular offset
+    SwerveModuleState correctedDesiredState = new SwerveModuleState();
+    correctedDesiredState.speedMetersPerSecond = desiredState.speedMetersPerSecond;
+    correctedDesiredState.angle = desiredState.angle.plus(Rotation2d.fromRadians(m_chassisAngularOffset));
+
+    // Optimize the desired state
+    correctedDesiredState.optimize(new Rotation2d(m_turningEncoder.getPosition()));
+
+    // Open-loop drive motor control (percent output)
+    double driveOutput = correctedDesiredState.speedMetersPerSecond / DriveConstants.kMaxSpeedMetersPerSecond;
+    m_drivingSpark.set(driveOutput);  // [-1, 1]
+
+    // Open-loop turn motor: basic proportional control
+    double currentAngle = m_turningEncoder.getPosition();  // radians
+    double targetAngle = correctedDesiredState.angle.getRadians();
+    double turnError = MathUtil.angleModulus(targetAngle - currentAngle);
+
+    double kTurnP = 2.0;  // TUNE THIS VALUE!
+    double turnOutput = MathUtil.clamp(turnError * kTurnP, -1.0, 1.0);
+    m_turningSpark.set(turnOutput);
 
     m_desiredState = desiredState;
   }

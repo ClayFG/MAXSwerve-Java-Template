@@ -16,6 +16,7 @@ import edu.wpi.first.math.kinematics.SwerveDriveOdometry;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.kinematics.SwerveModuleState;
 import frc.robot.Constants.DriveConstants;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 
 public class DriveSubsystem extends SubsystemBase {
@@ -82,8 +83,13 @@ public class DriveSubsystem extends SubsystemBase {
             m_rearLeft.getPosition(),
             m_rearRight.getPosition()
         });
+    
+    // Update the SmartDashboard with the robot's pose
+    SmartDashboard.putNumber("Odometry X", m_odometry.getPoseMeters().getX());
+    SmartDashboard.putNumber("Odometry Y", m_odometry.getPoseMeters().getY());
+    SmartDashboard.putNumber("Odometry Heading", getHeading());
   }
-
+ 
   /**
    * Returns the currently-estimated pose of the robot.
    *
@@ -118,24 +124,40 @@ public class DriveSubsystem extends SubsystemBase {
    * @param rot           Angular rate of the robot.
    * @param fieldRelative Whether the provided x and y speeds are relative to the
    *                      field.
+   * @param openloop     Whether the drive is open-loop (true) or closed-loop (false).
+   *                      Used for calibrations
    */
-  public void drive(double xSpeed, double ySpeed, double rot, boolean fieldRelative) {
+  public void drive(double xSpeed, double ySpeed, double rot, boolean fieldRelative, boolean openloop) {
     // Convert the commanded speeds into the correct units for the drivetrain
     double xSpeedDelivered = xSpeed * DriveConstants.kMaxSpeedMetersPerSecond;
     double ySpeedDelivered = ySpeed * DriveConstants.kMaxSpeedMetersPerSecond;
     double rotDelivered = rot * DriveConstants.kMaxAngularSpeed;
 
+    // Calculate the swerve module states
     var swerveModuleStates = DriveConstants.kDriveKinematics.toSwerveModuleStates(
         fieldRelative
             ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered,
                 Rotation2d.fromDegrees(getAngle()))
             : new ChassisSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered));
+
+    // Desaturate wheel speeds to ensure they are within limits
     SwerveDriveKinematics.desaturateWheelSpeeds(
         swerveModuleStates, DriveConstants.kMaxSpeedMetersPerSecond);
-    m_frontLeft.setDesiredState(swerveModuleStates[0]);
-    m_frontRight.setDesiredState(swerveModuleStates[1]);
-    m_rearLeft.setDesiredState(swerveModuleStates[2]);
-    m_rearRight.setDesiredState(swerveModuleStates[3]);
+
+    // Set the swerve module states
+    if (openloop) {
+        // Open-loop: Directly set the motor outputs without PID control
+        m_frontLeft.setDesiredStateOpenLoop(swerveModuleStates[0]);
+        m_frontRight.setDesiredStateOpenLoop(swerveModuleStates[1]);
+        m_rearLeft.setDesiredStateOpenLoop(swerveModuleStates[2]);
+        m_rearRight.setDesiredStateOpenLoop(swerveModuleStates[3]);
+    } else {
+        // Closed-loop: Use PID control to achieve the desired states
+        m_frontLeft.setDesiredState(swerveModuleStates[0]);
+        m_frontRight.setDesiredState(swerveModuleStates[1]);
+        m_rearLeft.setDesiredState(swerveModuleStates[2]);
+        m_rearRight.setDesiredState(swerveModuleStates[3]);
+    }
   }
 
   /**
@@ -147,6 +169,17 @@ public class DriveSubsystem extends SubsystemBase {
     m_rearLeft.setDesiredState(new SwerveModuleState(0, Rotation2d.fromDegrees(-45)));
     m_rearRight.setDesiredState(new SwerveModuleState(0, Rotation2d.fromDegrees(45)));
   }
+
+  /**
+    * Sets the wheels into a calibration position for wheel radius calibration.
+    * This method is used to set the wheels at specific angles for calibration purposes.
+    */
+  public void setWheelRadiusCailbration() {
+    m_frontLeft.setDesiredState(new SwerveModuleState(0, Rotation2d.fromDegrees(-45)));
+    m_frontRight.setDesiredState(new SwerveModuleState(0, Rotation2d.fromDegrees(45)));
+    m_rearLeft.setDesiredState(new SwerveModuleState(0, Rotation2d.fromDegrees(45)));
+    m_rearRight.setDesiredState(new SwerveModuleState(0, Rotation2d.fromDegrees(-45)));
+}
 
   /**
    * Sets the swerve ModuleStates.
@@ -191,5 +224,14 @@ public class DriveSubsystem extends SubsystemBase {
    */
   public double getTurnRate() {
     return m_navx.getRate() * (DriveConstants.kGyroReversed ? -1.0 : 1.0);
+  }
+  
+  public double[] getSwerveModulePositions() {
+    return new double[] {
+            m_frontLeft.getWheelRadians(),
+            m_frontRight.getWheelRadians(),
+            m_rearLeft.getWheelRadians(),
+            m_rearRight.getWheelRadians()
+    };
   }
 }

@@ -13,6 +13,7 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.trajectory.Trajectory;
 import edu.wpi.first.math.trajectory.TrajectoryConfig;
 import edu.wpi.first.math.trajectory.TrajectoryGenerator;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.AutoConstants;
@@ -24,6 +25,7 @@ import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.SwerveControllerCommand;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import java.util.List;
 
 /*
@@ -44,6 +46,8 @@ public class RobotContainer {
 
     // Add multiplier to adjust max speed of robot
     private double speedMultiplier = 1.0;
+
+    private final SendableChooser<Command> autoChooser = new SendableChooser<>();
 
   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.
@@ -69,9 +73,13 @@ public class RobotContainer {
                     -MathUtil.applyDeadband(m_driverController.getLeftY(), OIConstants.kDriveDeadband) * multiplier,
                     -MathUtil.applyDeadband(m_driverController.getLeftX(), OIConstants.kDriveDeadband) * multiplier,
                     -MathUtil.applyDeadband(m_driverController.getRightX(), OIConstants.kDriveDeadband) * multiplier,
-                    !robotOriented);
+                    !robotOriented,
+                    openLoop);
             },
             m_robotDrive));
+
+    // Configure autonomous commands
+    configureAutonomousCommands();
   }
 
   /**
@@ -101,49 +109,83 @@ public class RobotContainer {
         .onTrue(new InstantCommand(() -> robotOriented = !robotOriented));
   }
 
+  private void configureAutonomousCommands() {
+    Trajectory straightPath = createStraightLineTrajectory();
+    Trajectory sCurvePath = createSCurveTrajectory();
+
+    Command straightAuto = createSwerveAutoCommand(straightPath)
+        .andThen(() -> m_robotDrive.drive(0, 0, 0, false, false));
+    Command sCurveAuto = createSwerveAutoCommand(sCurvePath)
+        .andThen(() -> m_robotDrive.drive(0, 0, 0, false, false));
+
+    Command resetStraight = new InstantCommand(() -> m_robotDrive.resetOdometry(straightPath.getInitialPose()))
+        .andThen(straightAuto);
+    Command resetSCurve = new InstantCommand(() -> m_robotDrive.resetOdometry(sCurvePath.getInitialPose()))
+        .andThen(sCurveAuto);
+
+    autoChooser.setDefaultOption("Straight Path", resetStraight);
+    autoChooser.addOption("S-Curve Path", resetSCurve);
+    autoChooser.addOption("Wheel Diameter Calibration", wheelDiameterCalibrationCommand);
+
+    SmartDashboard.putData("Auto Mode", autoChooser);
+  }
+
+  /**
+   * Creates a swerve auto command to follow a given trajectory.
+   *
+   * @param trajectory The trajectory to follow.
+   * @return A command that follows the trajectory using the swerve drive system.
+   */
+  private Command createSwerveAutoCommand(Trajectory trajectory) {
+    return new SwerveControllerCommand(
+        trajectory,
+        m_robotDrive::getPose,
+        DriveConstants.kDriveKinematics,
+        new PIDController(1.0, 0.0, 0.0),
+        new PIDController(1.0, 0.0, 0.0),
+        new ProfiledPIDController(1.0, 0.0, 0.0, new TrapezoidProfile.Constraints(2.0, 2.0)),
+        m_robotDrive::setModuleStates,
+        m_robotDrive
+    );
+  }
+
+  /**
+   * Creates a straight-line trajectory for autonomous.
+   *
+   * @return A trajectory that moves straight forward.
+   */
+  private Trajectory createStraightLineTrajectory() {
+      return TrajectoryGenerator.generateTrajectory(
+          List.of(
+              new Pose2d(0, 0, new Rotation2d(0)), // Start position
+              new Pose2d(1, 0, new Rotation2d(0))  // End position (3 meters forward)
+          ),
+          new TrajectoryConfig(1, 1.0) // Max speed and acceleration
+      );
+  }
+
+  /**
+   * Creates an S-curve trajectory for autonomous.
+   *
+   * @return A trajectory that follows an S-curve.
+   */
+  private Trajectory createSCurveTrajectory() {
+      return TrajectoryGenerator.generateTrajectory(
+          List.of(
+              new Pose2d(0, 0, new Rotation2d(0)), // Start position
+              new Pose2d(1.5, 1.5, new Rotation2d(Math.PI / 4)), // Midpoint (diagonal)
+              new Pose2d(3, 0, new Rotation2d(0))  // End position (straight ahead)
+          ),
+          new TrajectoryConfig(2.0, 2.0) // Max speed and acceleration
+      );
+  }
+
   /**
    * Use this to pass the autonomous command to the main {@link Robot} class.
    *
    * @return the command to run in autonomous
    */
   public Command getAutonomousCommand() {
-    // Create config for trajectory
-    TrajectoryConfig config = new TrajectoryConfig(
-        AutoConstants.kMaxSpeedMetersPerSecond,
-        AutoConstants.kMaxAccelerationMetersPerSecondSquared)
-        // Add kinematics to ensure max speed is actually obeyed
-        .setKinematics(DriveConstants.kDriveKinematics);
-
-    // An example trajectory to follow. All units in meters.
-    Trajectory exampleTrajectory = TrajectoryGenerator.generateTrajectory(
-        // Start at the origin facing the +X direction
-        new Pose2d(0, 0, new Rotation2d(0)),
-        // Pass through these two interior waypoints, making an 's' curve path
-        List.of(new Translation2d(1, 1), new Translation2d(2, -1)),
-        // End 3 meters straight ahead of where we started, facing forward
-        new Pose2d(3, 0, new Rotation2d(0)),
-        config);
-
-    var thetaController = new ProfiledPIDController(
-        AutoConstants.kPThetaController, 0, 0, AutoConstants.kThetaControllerConstraints);
-    thetaController.enableContinuousInput(-Math.PI, Math.PI);
-
-    SwerveControllerCommand swerveControllerCommand = new SwerveControllerCommand(
-        exampleTrajectory,
-        m_robotDrive::getPose, // Functional interface to feed supplier
-        DriveConstants.kDriveKinematics,
-
-        // Position controllers
-        new PIDController(AutoConstants.kPXController, 0, 0),
-        new PIDController(AutoConstants.kPYController, 0, 0),
-        thetaController,
-        m_robotDrive::setModuleStates,
-        m_robotDrive);
-
-    // Reset odometry to the starting pose of the trajectory.
-    m_robotDrive.resetOdometry(exampleTrajectory.getInitialPose());
-
-    // Run path following command, then stop at the end.
-    return swerveControllerCommand.andThen(() -> m_robotDrive.drive(0, 0, 0, false));
+    return autoChooser.getSelected();
   }
 }
