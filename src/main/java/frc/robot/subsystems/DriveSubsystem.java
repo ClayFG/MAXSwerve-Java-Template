@@ -228,10 +228,11 @@ public class DriveSubsystem extends SubsystemBase {
   
   public double[] getSwerveModulePositions() {
     return new double[] {
-            m_frontLeft.getWheelRadians(),
-            m_frontRight.getWheelRadians(),
-            m_rearLeft.getWheelRadians(),
-            m_rearRight.getWheelRadians()
+        m_frontLeft.getPosition().distanceMeters,
+        m_frontRight.getPosition().distanceMeters,
+        m_rearLeft.getPosition().distanceMeters,
+        m_rearRight.getPosition().distanceMeters
     };
-  }
+}
+
 }

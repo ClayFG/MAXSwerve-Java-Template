@@ -19,6 +19,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Constants.AutoConstants;
 import frc.robot.Constants.DriveConstants;
 import frc.robot.Constants.OIConstants;
+import frc.robot.commands.WheelDiameterCalibrationCommand;
 import frc.robot.subsystems.DriveSubsystem;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
@@ -48,6 +49,10 @@ public class RobotContainer {
     private double speedMultiplier = 1.0;
 
     private final SendableChooser<Command> autoChooser = new SendableChooser<>();
+
+    private boolean openLoop = false; // Default to closed-loop mode
+
+    private final WheelDiameterCalibrationCommand wheelDiameterCalibrationCommand = new WheelDiameterCalibrationCommand(m_robotDrive);
 
   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.

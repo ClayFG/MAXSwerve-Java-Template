@@ -89,11 +89,6 @@ public class MAXSwerveModule {
         new Rotation2d(m_turningEncoder.getPosition() - m_chassisAngularOffset));
   }
 
-  public double getWheelRadians() {
-    return m_drivingEncoder.getPosition()
-                * (2 * Math.PI / ModuleConstants.kDrivingMotorReduction);
-  }
-
   /**
    * Sets the desired state for the module.
    *
@@ -137,8 +132,7 @@ public class MAXSwerveModule {
     double currentAngle = m_turningEncoder.getPosition();  // radians
     double targetAngle = correctedDesiredState.angle.getRadians();
     double turnError = MathUtil.angleModulus(targetAngle - currentAngle);
-
-    double kTurnP = 2.0;  // TUNE THIS VALUE!
+    double kTurnP = 1.0;  // TUNE THIS VALUE!
     double turnOutput = MathUtil.clamp(turnError * kTurnP, -1.0, 1.0);
     m_turningSpark.set(turnOutput);
 
