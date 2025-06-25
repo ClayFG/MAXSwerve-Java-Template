@@ -9,16 +9,15 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.trajectory.Trajectory;
 import edu.wpi.first.math.trajectory.TrajectoryConfig;
 import edu.wpi.first.math.trajectory.TrajectoryGenerator;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
-import frc.robot.Constants.AutoConstants;
 import frc.robot.Constants.DriveConstants;
 import frc.robot.Constants.OIConstants;
+import frc.robot.commands.FollowWaypointsCommand;
 import frc.robot.commands.WheelDiameterCalibrationCommand;
 import frc.robot.subsystems.DriveSubsystem;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -53,6 +52,17 @@ public class RobotContainer {
     private boolean openLoop = false; // Default to closed-loop mode
 
     private final WheelDiameterCalibrationCommand wheelDiameterCalibrationCommand = new WheelDiameterCalibrationCommand(m_robotDrive);
+
+    private final FollowWaypointsCommand followWaypointsCommand = new FollowWaypointsCommand(
+        m_robotDrive,
+        List.of(
+            new Pose2d(0.5, 0, new Rotation2d(-Math.PI / 4)),
+            new Pose2d(0, 0, new Rotation2d(Math.PI / 4)),
+            new Pose2d(0.5, 0, new Rotation2d(0))
+        ),
+        0.05, // Position tolerance in meters
+        .5 // Angle tolerance in degrees
+    );
 
   /**
    * The container for the robot. Contains subsystems, OI devices, and commands.
@@ -130,6 +140,7 @@ public class RobotContainer {
 
     autoChooser.setDefaultOption("Straight Path", resetStraight);
     autoChooser.addOption("S-Curve Path", resetSCurve);
+    autoChooser.addOption("Custom Pathing", followWaypointsCommand);
     autoChooser.addOption("Wheel Diameter Calibration", wheelDiameterCalibrationCommand);
 
     SmartDashboard.putData("Auto Mode", autoChooser);

@@ -160,6 +160,40 @@ public class DriveSubsystem extends SubsystemBase {
     }
   }
 
+  public void driveSpeed(double xSpeed, double ySpeed, double rot, boolean fieldRelative, boolean openloop) {
+    // Set speeds to the desired values
+    double xSpeedDelivered = xSpeed;
+    double ySpeedDelivered = ySpeed;
+    double rotDelivered = rot;
+
+    // Calculate the swerve module states
+    var swerveModuleStates = DriveConstants.kDriveKinematics.toSwerveModuleStates(
+        fieldRelative
+            ? ChassisSpeeds.fromFieldRelativeSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered,
+                Rotation2d.fromDegrees(getAngle()))
+            : new ChassisSpeeds(xSpeedDelivered, ySpeedDelivered, rotDelivered));
+
+    // Desaturate wheel speeds to ensure they are within limits
+    SwerveDriveKinematics.desaturateWheelSpeeds(
+        swerveModuleStates, DriveConstants.kMaxSpeedMetersPerSecond);
+
+    // Set the swerve module states
+    if (openloop) {
+        // Open-loop: Directly set the motor outputs without PID control
+        m_frontLeft.setDesiredStateOpenLoop(swerveModuleStates[0]);
+        m_frontRight.setDesiredStateOpenLoop(swerveModuleStates[1]);
+        m_rearLeft.setDesiredStateOpenLoop(swerveModuleStates[2]);
+        m_rearRight.setDesiredStateOpenLoop(swerveModuleStates[3]);
+    } else {
+        // Closed-loop: Use PID control to achieve the desired states
+        m_frontLeft.setDesiredState(swerveModuleStates[0]);
+        m_frontRight.setDesiredState(swerveModuleStates[1]);
+        m_rearLeft.setDesiredState(swerveModuleStates[2]);
+        m_rearRight.setDesiredState(swerveModuleStates[3]);
+    }
+  }
+
+
   /**
    * Sets the wheels into an X formation to prevent movement.
    */
@@ -233,6 +267,14 @@ public class DriveSubsystem extends SubsystemBase {
         m_rearLeft.getPosition().distanceMeters,
         m_rearRight.getPosition().distanceMeters
     };
-}
-
+  }
+  public ChassisSpeeds getCurrentSpeeds() {
+      SwerveModuleState[] states = new SwerveModuleState[] {
+          m_frontLeft.getState(),
+          m_frontRight.getState(),
+          m_rearLeft.getState(),
+          m_rearRight.getState()
+      };
+    return DriveConstants.kDriveKinematics.toChassisSpeeds(states);
+  } 
 }

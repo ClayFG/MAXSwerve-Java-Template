@@ -20,7 +20,6 @@ import com.revrobotics.RelativeEncoder;
 
 import frc.robot.Configs;
 import frc.robot.Constants.DriveConstants;
-import frc.robot.Constants.ModuleConstants;;
 
 public class MAXSwerveModule {
   private final SparkMax m_drivingSpark;
