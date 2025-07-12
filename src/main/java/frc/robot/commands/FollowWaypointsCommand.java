@@ -4,11 +4,12 @@ import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.subsystems.DriveSubsystem;
 import frc.robot.Constants.AutoConstants;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.trajectory.TrapezoidProfile.Constraints;
-import edu.wpi.first.math.controller.PIDController;
 
 import java.util.List;
 
@@ -20,14 +21,18 @@ public class FollowWaypointsCommand extends Command {
 
     private int currentWaypointIndex = 0;
 
-    // PID controllers for x, y, and theta control This is just declaring equivalent of the Holomonic Controller
+    private double elapsedTime = 0;
+    private double timeSinceLastUpdate = 0;
+    private final double profileUpdateInterval = 0.2; // update every 0.1s
 
-    //Trapezoidal profile variables
-    private final TrapezoidProfile.Constraints velocityConstraints = new Constraints(AutoConstants.kMaxSpeedMetersPerSecond, AutoConstants.kMaxAccelerationMetersPerSecondSquared);
-    private final TrapezoidProfile.Constraints rotationConstraints = new Constraints(AutoConstants.kMaxAngularSpeedRadiansPerSecond, AutoConstants.kMaxAngularSpeedRadiansPerSecondSquared);
-    TrapezoidProfile profileX = new TrapezoidProfile(velocityConstraints);
-    TrapezoidProfile profileY = new TrapezoidProfile(velocityConstraints);
-    TrapezoidProfile profileRot = new TrapezoidProfile(rotationConstraints);
+    private final TrapezoidProfile.Constraints velocityConstraints =
+        new Constraints(AutoConstants.kMaxSpeedMetersPerSecond, AutoConstants.kMaxAccelerationMetersPerSecondSquared);
+    private final TrapezoidProfile.Constraints rotationConstraints =
+        new Constraints(AutoConstants.kMaxAngularSpeedRadiansPerSecond, AutoConstants.kMaxAngularSpeedRadiansPerSecondSquared);
+
+    private TrapezoidProfile.State nextStateX = new TrapezoidProfile.State();
+    private TrapezoidProfile.State nextStateY = new TrapezoidProfile.State();
+    private TrapezoidProfile.State nextStateRot = new TrapezoidProfile.State();
 
     public FollowWaypointsCommand(
         DriveSubsystem drive,
@@ -39,55 +44,68 @@ public class FollowWaypointsCommand extends Command {
         this.waypoints = waypoints;
         this.positionTolerance = positionToleranceMeters;
         this.angleToleranceRad = Math.toRadians(angleToleranceDegrees);
+        addRequirements(drive);
     }
 
     @Override
     public void initialize() {
+        drive.zeroHeading();
+        drive.resetOdometry(new Pose2d(0,0,new Rotation2d(0)));
         currentWaypointIndex = 0;
+        elapsedTime = 0;
+        timeSinceLastUpdate = profileUpdateInterval; // force profile gen at start
     }
 
     @Override
     public void execute() {
-        // Compute current pose components
+
+        elapsedTime += 0.02;
+        timeSinceLastUpdate += 0.02;
+
         Pose2d currentPose = drive.getPose();
-        Translation2d currentTranslation = currentPose.getTranslation();
-
-        // Set goalPose to the current waypoint
         Pose2d goalPose = waypoints.get(currentWaypointIndex);
-        Translation2d goalTranslation = goalPose.getTranslation();
 
-        double dx = goalTranslation.getX() - currentTranslation.getX();
-        double dy = goalTranslation.getY() - currentTranslation.getY();
+        // Only regenerate trapezoid profiles every 0.1s
+        if (timeSinceLastUpdate >= profileUpdateInterval) {
+            timeSinceLastUpdate = 0;
+            System.out.printf("Waypoint %d | xVel: %.2f, yVel: %.2f, rotVel: %.2f\n",
+            currentWaypointIndex, nextStateX.velocity, nextStateY.velocity, nextStateRot.velocity);
 
-        double distanceToGoal = Math.hypot(dx, dy);
-        double direction = Math.atan2(dy, dx);
+            // X profile
+            TrapezoidProfile profileX = new TrapezoidProfile(velocityConstraints);
+            TrapezoidProfile.State currentStateX = new TrapezoidProfile.State(currentPose.getX(), 0);
+            TrapezoidProfile.State goalStateX = new TrapezoidProfile.State(goalPose.getX(), 0);
+            nextStateX = profileX.calculate(profileUpdateInterval, currentStateX, goalStateX);
 
-        // Compute errors
-        double xError = goalPose.getX() - currentPose.getX();
-        double yError = goalPose.getY() - currentPose.getY();
-        double thetaError = goalPose.getRotation().minus(currentPose.getRotation()).getRadians();
+            // Y profile
+            TrapezoidProfile profileY = new TrapezoidProfile(velocityConstraints);
+            TrapezoidProfile.State currentStateY = new TrapezoidProfile.State(currentPose.getY(), 0);
+            TrapezoidProfile.State goalStateY = new TrapezoidProfile.State(goalPose.getY(), 0);
+            nextStateY = profileY.calculate(profileUpdateInterval, currentStateY, goalStateY);
 
-        // Create trapezoidal profiles for X, Y, and rotation
-        TrapezoidProfile.State currentStateX = new TrapezoidProfile.State(currentPose.getX(), 0); // Initial state for X
-        TrapezoidProfile.State goalStateX = new TrapezoidProfile.State(goalPose.getX(), 0); // Goal state for X
-        var nextstatex = profileX.calculate(0.02, currentStateX, goalStateX); // Calculate next state for X
+            // Rotation profile
+            TrapezoidProfile profileRot = new TrapezoidProfile(rotationConstraints);
+            TrapezoidProfile.State currentStateRot = new TrapezoidProfile.State(currentPose.getRotation().getRadians(), 0);
+            TrapezoidProfile.State goalStateRot = new TrapezoidProfile.State(goalPose.getRotation().getRadians(), 0);
+            nextStateRot = profileRot.calculate(profileUpdateInterval, currentStateRot, goalStateRot);
+        }
 
-        TrapezoidProfile.State currentStateY = new TrapezoidProfile.State(currentPose.getY(), 0); // Initial state for Y
-        TrapezoidProfile.State goalStateY = new TrapezoidProfile.State(goalPose.getY(), 0); // Goal state for Y
-        var nextstatey = profileY.calculate(0.02, currentStateY, goalStateY); // Calculate next state for Y
+        // Use velocities from profile outputs
+        double xVel = MathUtil.applyDeadband(nextStateX.velocity, 0.05);
+        double yVel = MathUtil.applyDeadband(nextStateY.velocity, 0.05);
+        double rotVel = MathUtil.applyDeadband(nextStateRot.velocity, 0.05);
 
-        TrapezoidProfile.State currentStateRot = new TrapezoidProfile.State(currentPose.getRotation().getRadians(), 0); // Initial state for rotation
-        TrapezoidProfile.State goalStateRot = new TrapezoidProfile.State(goalPose.getRotation().getRadians(), 0); // Goal state for rotation
-        var nextstaterot = profileRot.calculate(0.02, currentStateRot, goalStateRot); // Calculate next state for rotation
-
-        // Use PID controllers to calculate control outputs based on trapezoidal profile positions
-
-        // Drive the robot using the calculated control outputs
-        drive.driveSpeed(nextstatex.velocity, nextstatey.velocity, nextstaterot.velocity, true, false);
+        drive.driveSpeed(xVel, yVel, rotVel, true, false);
 
         // Check if the robot is within tolerance of the current waypoint
+        double distanceToGoal = currentPose.getTranslation().getDistance(goalPose.getTranslation());
+        double thetaError = goalPose.getRotation().minus(currentPose.getRotation()).getRadians();
+
         if (distanceToGoal < positionTolerance && Math.abs(thetaError) < angleToleranceRad) {
-            currentWaypointIndex++; // Move to the next waypoint
+            currentWaypointIndex++;
+            if (currentWaypointIndex < waypoints.size()) {
+                timeSinceLastUpdate = profileUpdateInterval; // trigger profile regen
+            }
         }
     }
 
@@ -98,6 +116,6 @@ public class FollowWaypointsCommand extends Command {
 
     @Override
     public void end(boolean interrupted) {
-        drive.driveSpeed(0, 0, 0,true, false);
+        drive.driveSpeed(0, 0, 0, true, false);
     }
 }

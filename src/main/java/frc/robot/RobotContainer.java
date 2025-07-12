@@ -56,12 +56,11 @@ public class RobotContainer {
     private final FollowWaypointsCommand followWaypointsCommand = new FollowWaypointsCommand(
         m_robotDrive,
         List.of(
-            new Pose2d(0.5, 0, new Rotation2d(-Math.PI / 4)),
-            new Pose2d(0, 0, new Rotation2d(Math.PI / 4)),
-            new Pose2d(0.5, 0, new Rotation2d(0))
+            new Pose2d(1, 0, new Rotation2d(0)),
+            new Pose2d(0, 0, new Rotation2d(0))
         ),
         0.05, // Position tolerance in meters
-        .5 // Angle tolerance in degrees
+        3 // Angle tolerance in degrees
     );
 
   /**

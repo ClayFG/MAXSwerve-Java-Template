@@ -193,6 +193,25 @@ public class DriveSubsystem extends SubsystemBase {
     }
   }
 
+  //drive sheel dutycycle
+  public void driveAllPercent(double drivespeed) {
+    // Set the speed to the desired value
+    double speedDelivered = drivespeed;
+
+    // Calculate the swerve module states
+    var swerveModuleStates = DriveConstants.kDriveKinematics.toSwerveModuleStates(
+        new ChassisSpeeds(speedDelivered, 0, 0));
+
+    // Desaturate wheel speeds to ensure they are within limits
+    SwerveDriveKinematics.desaturateWheelSpeeds(
+        swerveModuleStates, DriveConstants.kMaxSpeedMetersPerSecond);
+
+    // Set the swerve module states
+    m_frontLeft.setDesiredStateOpenLoop(swerveModuleStates[0]);
+    m_frontRight.setDesiredStateOpenLoop(swerveModuleStates[1]);
+    m_rearLeft.setDesiredStateOpenLoop(swerveModuleStates[2]);
+    m_rearRight.setDesiredStateOpenLoop(swerveModuleStates[3]);
+  }
 
   /**
    * Sets the wheels into an X formation to prevent movement.
@@ -259,6 +278,9 @@ public class DriveSubsystem extends SubsystemBase {
   public double getTurnRate() {
     return m_navx.getRate() * (DriveConstants.kGyroReversed ? -1.0 : 1.0);
   }
+  
+  //set PID gains
+  //add this in the future 
   
   public double[] getSwerveModulePositions() {
     return new double[] {
